@@ -22,7 +22,7 @@ def arg_parse():
     parser = argparse.ArgumentParser(description='YOLO v3 检测模型')
 
     parser.add_argument("--images", dest='images', help="待检测图像目录", default="/Users/hehongbo/Downloads/小样本", type=str)
-    parser.add_argument("--det", dest='det', help="检测结果保存目录", default="det", type=str)
+    parser.add_argument("--det", dest='det', help="检测结果保存目录", default="/Users/hehongbo/Downloads/YOLO结果", type=str)
     parser.add_argument("--bs", dest="bs", help="Batch size，默认为1", default=1)
     parser.add_argument("--confidence", dest="confidence", help="目标检测结果置信度阈值", default=0.5)
     parser.add_argument("--nms_thresh", dest="nms_thresh", help="NMS非极大值抑制阈值", default=0.4)
