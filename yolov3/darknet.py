@@ -5,15 +5,16 @@ from torch.autograd import Variable
 from yolov3.util import *
 
 
-def get_test_input():
-    img = cv2.imread("dog-cycle-car.png")
+def get_test_input(img_path):
+    img = cv2.imread(img_path)
     img = cv2.resize(img, (416, 416))  # Resize to the input dimension
-    img_ = img[:, :, ::-1].transpose((2, 0,
-                                      1))  # img是【h,w,channel】，这里的img[:,:,::-1]是将第三个维度channel从opencv的BGR转化为pytorch的RGB，然后transpose((2,0,1))的意思是将[height,width,channel]->[channel,height,width]
-    img_ = img_[np.newaxis, :, :, :] / 255.0  # Add a channel at 0 (for batch) | Normalise
-    img_ = torch.from_numpy(img_).float()  # Convert to float
-    img_ = Variable(img_)  # Convert to Variable
-    return img_
+    # img是【h,w,channel】，这里的img[:,:,::-1]是将第三个维度channel从opencv的BGR转化为pytorch的RGB，
+    # 然后transpose((2,0,1))的意思是将[height,width,channel]->[channel,height,width]
+    img = img[:, :, ::-1].transpose((2, 0, 1))
+    img = img[np.newaxis, :, :, :] / 255.0  # Add a channel at 0 (for batch) | Normalise
+    img = torch.from_numpy(img).float()  # Convert to float
+    img = Variable(img)  # Convert to Variable
+    return img
 
 
 def parse_cfg(cfgfile):
@@ -22,11 +23,13 @@ def parse_cfg(cfgfile):
     返回值: 列表对象,其中每一个元素为一个字典类型对应于一个要建立的神经网络模块（层）
     """
     # 加载文件并过滤掉文本中多余内容
-    file = open(cfgfile, 'r')
-    lines = file.read().split('\n')  # store the lines in a list等价于readlines
+    file = open(cfgfile, "r")
+    lines = file.read().split("\n")  # store the lines in a list等价于readlines
     lines = [x for x in lines if len(x) > 0]  # 去掉空行
-    lines = [x for x in lines if x[0] != '#']  # 去掉以#开头的注释行
-    lines = [x.rstrip().lstrip() for x in lines]  # 去掉左右两边的空格(rstricp是去掉右边的空格，lstrip是去掉左边的空格)
+    lines = [x for x in lines if x[0] != "#"]  # 去掉以#开头的注释行
+    lines = [
+        x.rstrip().lstrip() for x in lines
+    ]  # 去掉左右两边的空格(rstricp是去掉右边的空格，lstrip是去掉左边的空格)
     # cfg文件中的每个块用[]括起来最后组成一个列表，一个block存储一个块的内容，即每个层用一个字典block存储。
     block = {}
     blocks = []
@@ -38,7 +41,9 @@ def parse_cfg(cfgfile):
             block["type"] = line[1:-1].rstrip()  # 把cfg的[]中的块名作为键type的值
         else:
             key, value = line.split("=")  # 按等号分割
-            block[key.rstrip()] = value.lstrip()  # 左边是key(去掉右空格)，右边是value(去掉左空格)，形成一个block字典的键值对
+            block[
+                key.rstrip()
+            ] = value.lstrip()  # 左边是key(去掉右空格)，右边是value(去掉左空格)，形成一个block字典的键值对
     blocks.append(block)  # 退出循环，将最后一个未加入的block加进去
     # print('\n\n'.join([repr(x) for x in blocks]))
     return blocks
@@ -59,7 +64,7 @@ class EmptyLayer(nn.Module):
 
 
 class DetectionLayer(nn.Module):
-    '''yolo 检测层的具体实现, 在特征图上使用锚点预测目标区域和类别, 功能函数在predict_transform中'''
+    """yolo 检测层的具体实现, 在特征图上使用锚点预测目标区域和类别, 功能函数在predict_transform中"""
 
     def __init__(self, anchors):
         super(DetectionLayer, self).__init__()
@@ -68,16 +73,22 @@ class DetectionLayer(nn.Module):
 
 def create_modules(blocks):
     net_info = blocks[0]  # blocks[0]存储了cfg中[net]的信息，它是一个字典，获取网络输入和预处理相关信息
-    module_list = nn.ModuleList()  # module_list用于存储每个block,每个block对应cfg文件中一个块，类似[convolutional]里面就对应一个卷积块
+    module_list = (
+        nn.ModuleList()
+    )  # module_list用于存储每个block,每个block对应cfg文件中一个块，类似[convolutional]里面就对应一个卷积块
     prev_filters = 3  # 初始值对应于输入数据3通道，用来存储我们需要持续追踪被应用卷积层的卷积核数量（上一层的卷积核数量（或特征图深度））
-    output_filters = []  # 我们不仅需要追踪前一层的卷积核数量，还需要追踪之前每个层。随着不断地迭代，我们将每个模块的输出卷积核数量添加到 output_filters 列表上。
-    for index, x in enumerate(blocks[1:]):  # 这里，我们迭代block[1:] 而不是blocks，因为blocks的第一个元素是一个net块，它不属于前向传播。
+    output_filters = (
+        []
+    )  # 我们不仅需要追踪前一层的卷积核数量，还需要追踪之前每个层。随着不断地迭代，我们将每个模块的输出卷积核数量添加到 output_filters 列表上。
+    for index, x in enumerate(
+            blocks[1:]
+    ):  # 这里，我们迭代block[1:] 而不是blocks，因为blocks的第一个元素是一个net块，它不属于前向传播。
         module = nn.Sequential()  # 这里每个块用nn.sequential()创建为了一个module,一个module有多个层
         # check the type of block
         # create a new module for the block
         # append to module_list
-        if (x["type"] == "convolutional"):
-            ''' 1. 卷积层 '''
+        if x["type"] == "convolutional":
+            """ 1. 卷积层 """
             # 获取激活函数/批归一化/卷积层参数（通过字典的键获取值）
             activation = x["activation"]
             try:
@@ -109,19 +120,21 @@ def create_modules(blocks):
             if activation == "leaky":
                 activn = nn.LeakyReLU(0.1, inplace=True)
                 module.add_module("leaky_{0}".format(index), activn)
-        elif (x["type"] == "upsample"):
-            '''
+        elif x["type"] == "upsample":
+            """
             2. upsampling layer
             没有使用 Bilinear2dUpsampling
             实际使用的为最近邻插值
-            '''
-            stride = int(x["stride"])  # 这个stride在cfg中就是2，所以下面的scale_factor写2或者stride是等价的
+            """
+            stride = int(
+                x["stride"]
+            )  # 这个stride在cfg中就是2，所以下面的scale_factor写2或者stride是等价的
             upsample = nn.Upsample(scale_factor=2, mode="nearest")
             module.add_module("upsample_{}".format(index), upsample)
         # route layer -> Empty layer
         # route层的作用：当layer取值为正时，输出这个正数对应的层的特征，如果layer取值为负数，输出route层向后退layer层对应层的特征
-        elif (x["type"] == "route"):
-            x["layers"] = x["layers"].split(',')
+        elif x["type"] == "route":
+            x["layers"] = x["layers"].split(",")
             # Start  of a route
             start = int(x["layers"][0])
             # end, if there exists one.
@@ -142,7 +155,9 @@ def create_modules(blocks):
                 filters = output_filters[index + start]
         # shortcut corresponds to skip connection
         elif x["type"] == "shortcut":
-            shortcut = EmptyLayer()  # 使用空的层，因为它还要执行一个非常简单的操作（加）。没必要更新 filters 变量,因为它只是将前一层的特征图添加到后面的层上而已。
+            shortcut = (
+                EmptyLayer()
+            )  # 使用空的层，因为它还要执行一个非常简单的操作（加）。没必要更新 filters 变量,因为它只是将前一层的特征图添加到后面的层上而已。
             module.add_module("shortcut_{}".format(index), shortcut)
         # Yolo is the detection layer
         elif x["type"] == "yolo":
@@ -164,14 +179,18 @@ class Darknet(nn.Module):
     def __init__(self, cfgfile):
         super(Darknet, self).__init__()
         self.blocks = parse_cfg(cfgfile)  # 调用parse_cfg函数
-        self.net_info, self.module_list = create_modules(self.blocks)  # 调用create_modules函数
+        self.net_info, self.module_list = create_modules(
+            self.blocks
+        )  # 调用create_modules函数
 
     def forward(self, x, CUDA):
         modules = self.blocks[1:]  # 除了net块之外的所有，forward这里用的是blocks列表中的各个block块字典
         outputs = {}  # We cache the outputs for the route layer
-        write = 0  # write表示我们是否遇到第一个检测。write=0，则收集器尚未初始化，write=1，则收集器已经初始化，我们只需要将检测图与收集器级联起来即可。
+        write = (
+            0
+        )  # write表示我们是否遇到第一个检测。write=0，则收集器尚未初始化，write=1，则收集器已经初始化，我们只需要将检测图与收集器级联起来即可。
         for i, module in enumerate(modules):
-            module_type = (module["type"])
+            module_type = module["type"]
             if module_type == "convolutional" or module_type == "upsample":
                 x = self.module_list[i](x)
             elif module_type == "route":
@@ -188,11 +207,13 @@ class Darknet(nn.Module):
                         layers[1] = layers[1] - i
                     map1 = outputs[i + layers[0]]
                     map2 = outputs[i + layers[1]]
-                    x = torch.cat((map1, map2), 1)  # 第二个参数设为 1,这是因为我们希望将特征图沿anchor数量的维度级联起来。
+                    x = torch.cat(
+                        (map1, map2), 1
+                    )  # 第二个参数设为 1,这是因为我们希望将特征图沿anchor数量的维度级联起来。
             elif module_type == "shortcut":
                 from_ = int(module["from"])
                 x = outputs[i - 1] + outputs[i + from_]  # 求和运算，它只是将前一层的特征图添加到后面的层上而已
-            elif module_type == 'yolo':
+            elif module_type == "yolo":
                 anchors = self.module_list[i][0].anchors
                 # 从net_info(实际就是blocks[0]，即[net])中get the input dimensions
                 inp_dim = int(self.net_info["height"])
@@ -203,17 +224,21 @@ class Darknet(nn.Module):
                 # 在util.py中的predict_transform()函数利用x(是传入yolo层的feature map)，得到每个格子所对应的anchor最终得到的目标
                 # 坐标与宽高，以及出现目标的得分与每种类别的得分。经过predict_transform变换后的x的维度是(batch_size, grid_size*grid_size*num_anchors, 5+类别数量)
                 x = predict_transform(x, inp_dim, anchors, num_classes, CUDA)
-                if not write:  # if no collector has been intialised. 因为一个空的tensor无法与一个有数据的tensor进行concatenate操作，
+                if (
+                        not write
+                ):  # if no collector has been intialised. 因为一个空的tensor无法与一个有数据的tensor进行concatenate操作，
                     detections = x  # 所以detections的初始化在有预测值出来时才进行，
                     write = 1  # 用write = 1标记，当后面的分数出来后，直接concatenate操作即可。
                 else:
-                    '''
+                    """
                     变换后x的维度是(batch_size, grid_size*grid_size*num_anchors, 5+类别数量)，这里是在维度1上进行concatenate，即按照
                     anchor数量的维度进行连接，对应教程part3中的Bounding Box attributes图的行进行连接。yolov3中有3个yolo层，所以
                     对于每个yolo层的输出先用predict_transform()变成每行为一个anchor对应的预测值的形式(不看batch_size这个维度，x剩下的
                     维度可以看成一个二维tensor)，这样3个yolo层的预测值按照每个方框对应的行的维度进行连接。得到了这张图处所有anchor的预测值，后面的NMS等操作可以一次完成
-                    '''
-                    detections = torch.cat((detections, x), 1)  # 将在3个不同level的feature map上检测结果存储在 detections 里
+                    """
+                    detections = torch.cat(
+                        (detections, x), 1
+                    )  # 将在3个不同level的feature map上检测结果存储在 detections 里
             outputs[i] = x
         return detections
 
@@ -231,31 +256,41 @@ class Darknet(nn.Module):
         header = np.fromfile(fp, dtype=np.int32, count=5)  # 这里读取first 5 values权重
         self.header = torch.from_numpy(header)
         self.seen = self.header[3]
-        weights = np.fromfile(fp, dtype=np.float32)  # 加载 np.ndarray 中的剩余权重，权重是以float32类型存储的
+        weights = np.fromfile(
+            fp, dtype=np.float32
+        )  # 加载 np.ndarray 中的剩余权重，权重是以float32类型存储的
         ptr = 0
         for i in range(len(self.module_list)):
-            module_type = self.blocks[i + 1]["type"]  # blocks中的第一个元素是网络参数和图像的描述，所以从blocks[1]开始读入
+            module_type = self.blocks[i + 1][
+                "type"
+            ]  # blocks中的第一个元素是网络参数和图像的描述，所以从blocks[1]开始读入
             # If module_type is convolutional load weights
             # Otherwise ignore.
             if module_type == "convolutional":
                 model = self.module_list[i]
                 try:
-                    batch_normalize = int(self.blocks[i + 1]["batch_normalize"])  # 当有bn层时，"batch_normalize"对应值为1
+                    batch_normalize = int(
+                        self.blocks[i + 1]["batch_normalize"]
+                    )  # 当有bn层时，"batch_normalize"对应值为1
                 except:
                     batch_normalize = 0
                 conv = model[0]
-                if (batch_normalize):
+                if batch_normalize:
                     bn = model[1]
                     # Get the number of weights of Batch Norm Layer
                     num_bn_biases = bn.bias.numel()
                     # Load the weights
-                    bn_biases = torch.from_numpy(weights[ptr:ptr + num_bn_biases])
+                    bn_biases = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
                     ptr += num_bn_biases
                     bn_weights = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
                     ptr += num_bn_biases
-                    bn_running_mean = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    bn_running_mean = torch.from_numpy(
+                        weights[ptr: ptr + num_bn_biases]
+                    )
                     ptr += num_bn_biases
-                    bn_running_var = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    bn_running_var = torch.from_numpy(
+                        weights[ptr: ptr + num_bn_biases]
+                    )
                     ptr += num_bn_biases
                     # Cast the loaded weights into dims of model weights.
                     bn_biases = bn_biases.view_as(bn.bias.data)
@@ -280,7 +315,7 @@ class Darknet(nn.Module):
                 # Let us load the weights for the Convolutional layers
                 num_weights = conv.weight.numel()
                 # Do the same as above for weights
-                conv_weights = torch.from_numpy(weights[ptr:ptr + num_weights])
+                conv_weights = torch.from_numpy(weights[ptr: ptr + num_weights])
                 ptr = ptr + num_weights
                 conv_weights = conv_weights.view_as(conv.weight.data)
                 conv.weight.data.copy_(conv_weights)
