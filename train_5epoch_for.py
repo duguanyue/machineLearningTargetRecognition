@@ -30,7 +30,7 @@ train_set = parser.add_mutually_exclusive_group()
 #                    help='Dataset root directory path')
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
-parser.add_argument('--batch_size', default=1, type=int,
+parser.add_argument('--batch_size', default=12, type=int,
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -90,7 +90,6 @@ def train():
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
     '''
-    #train_sets = "/Users/xuzhang/PycharmProjects/UnbalancedSamples/data/train_coreless_3500.txt"
     train_sets = "./data/train_coreless_3500.txt"
     cfg = sixray
     dataset = SIXrayDetection(image_sets=train_sets)
@@ -98,7 +97,6 @@ def train():
         import visdom
         viz = visdom.Visdom()
 
-    #ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
 
@@ -169,7 +167,12 @@ def train():
             adjust_learning_rate(optimizer, args.gamma, step_index)
 
         # load train data
-        images, targets = next(batch_iterator)
+        #images, targets = next(batch_iterator)
+        try:
+            images, targets = next(batch_iterator)
+        except StopIteration:
+            batch_iterator = iter(data_loader)
+            images, targets = next(batch_iterator)
 
         if args.cuda:
             images = Variable(images.cuda())
@@ -181,20 +184,22 @@ def train():
                 targets = [Variable(ann) for ann in targets]
         # forward
         t0 = time.time()
+        images = images.float()
         out = net(images)
         # backprop
         optimizer.zero_grad()
+
         loss_l, loss_c = criterion(out, targets)
         loss = loss_l + loss_c
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        loc_loss += loss_l.item()  #loss_l.data[0] >> loss_l.data
+        conf_loss += loss_c.item() #loss_c.data[0] >> loss_c.data
 
         if iteration % 10 == 0:
             print('timer: %.4f sec.' % (t1 - t0))
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
+            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.item()), end=' ')    #loss.data[0] >> loss.data
 
         if args.visdom:
             update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
@@ -202,7 +207,7 @@ def train():
 
         if iteration != 0 and iteration % 5000 == 0:
             print('Saving state, iter:', iteration)
-            torch.save(ssd_net.state_dict(), 'weights/ssd300_COCO_' +
+            torch.save(ssd_net.state_dict(), 'weights/ssd300_sixray_' +
                        repr(iteration) + '.pth')
     torch.save(ssd_net.state_dict(),
                args.save_folder + '' + args.dataset + '.pth')
