@@ -23,3 +23,6 @@ For Test:
 运行方式（python3）：
 python train.py --batch_size 12 --cuda False
 （batch_size需要算好了，否则不能整除就报错了）
+
+
+https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth
