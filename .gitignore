@@ -105,4 +105,5 @@ venv.bak/
 
 .DS_Store
 weights/vgg16_reducedfc.pth
+weights/SIXRAY.pth
 data/sixray/*
