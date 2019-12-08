@@ -24,7 +24,8 @@ SIXray_CLASSES = (
 )
 
 # note: if you used our download scripts, this should be right
-SIXray_ROOT = "/Users/xuzhang/Documents/UnbalancedSamples/coreless_5000/"
+# SIXray_ROOT = "/Users/xuzhang/Documents/UnbalancedSamples/coreless_5000/"
+SIXray_ROOT = './image/'
 
 
 class SIXrayAnnotationTransform(object):
@@ -161,7 +162,7 @@ class SIXrayDetection(data.Dataset):
         target = self._annopath % img_id  # 注释目录
         # print(target)
         # print(self._imgpath % img_id)
-        img = cv2.imread(self._imgpath % img_id)
+        img = cv2.imread(self._imgpath_jpg % img_id)
         if img is None:
             img = cv2.imread(self._imgpath1 % img_id)
         if img is None:
@@ -170,7 +171,6 @@ class SIXrayDetection(data.Dataset):
         if img is None:
             print('\nwrong\n')
             print(self._imgpath_jpg % img_id)
-
 
         height, width, channels = img.shape
         # print("height: " + str(height) + " ; width : " + str(width) + " ; channels " + str(channels) )
