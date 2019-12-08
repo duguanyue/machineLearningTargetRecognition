@@ -103,5 +103,6 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+.DS_Store
 weights/vgg16_reducedfc.pth
 data/sixray/*
